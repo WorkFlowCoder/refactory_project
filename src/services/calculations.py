@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 TAX = 0.2
 SHIPPING_LIMIT = 50
@@ -9,22 +10,22 @@ MAX_DISCOUNT = 200
 
 # Fidelity points
 
-def calcul_fidelity_points(transactions):
+def calcul_fidelity_points(transactions: dict) -> list:
     loyalty_points = {}
     for transaction in transactions:
-        cid = transaction.get_customer_id()
-        if cid not in loyalty_points:
-            loyalty_points[cid] = 0
-        loyalty_points[cid] += transaction.get_qty() * transaction.get_unit_price() * LOYALTY_RATIO
+        customer_id = transaction.get_customer_id()
+        if customer_id not in loyalty_points:
+            loyalty_points[customer_id] = 0
+        loyalty_points[customer_id] += transaction.get_qty() * transaction.get_unit_price() * LOYALTY_RATIO
     return loyalty_points
 
 # Calculate promotions
 
-def calcul_with_promo(transaction,prod,promotions):
+def calcul_with_promo(transaction: Any,product: Any,promotions: dict) -> list:
     discount_rate = 0
     fixed_discount = 0
     promo_code = transaction.get_promo_code()
-    base_price = prod.get_price()
+    base_price = product.get_price()
     if promo_code and promo_code in promotions:
             promo = promotions[promo_code]
             if promo.get_active():
@@ -39,19 +40,19 @@ def calcul_with_promo(transaction,prod,promotions):
 
 # Remise
 
-def get_remise(sub,level,totals_by_customer,cid):
+def get_remise(subtotal: int, level: str, totals_by_customer: dict, customer_id: int) -> float:
     disc = 0.0
-    if sub > 50:
-        disc = sub * 0.05
-    if sub > 100:
-        disc = sub * 0.10  # écrase la précédente (bug intentionnel)
-    if sub > 500:
-        disc = sub * 0.15
-    if sub > 1000 and level == "PREMIUM":
-        disc = sub * 0.20
+    if subtotal > 50:
+        disc = subtotal * 0.05
+    if subtotal > 100:
+        disc = subtotal * 0.10  # écrase la précédente (bug intentionnel)
+    if subtotal > 500:
+        disc = subtotal * 0.15
+    if subtotal > 1000 and level == "PREMIUM":
+        disc = subtotal * 0.20
     first_order_date = (
-        totals_by_customer[cid]["items"][0].get_date()
-        if totals_by_customer[cid]["items"]
+        totals_by_customer[customer_id]["items"][0].get_date()
+        if totals_by_customer[customer_id]["items"]
         else ""
     )
     day_of_week = 0
@@ -68,9 +69,9 @@ def get_remise(sub,level,totals_by_customer,cid):
 
 # Discount
 
-def calcul_total_discount(loyalty_points,cid,disc):
+def calcul_total_discount(loyalty_points: list, customer_id: int, disc: float) -> Any:
     loyalty_discount = 0.0
-    pts = loyalty_points.get(cid, 0)
+    pts = loyalty_points.get(customer_id, 0)
     if pts > 100:
         loyalty_discount = min(pts * 0.1, 50.0)
     if pts > 500:
@@ -90,11 +91,11 @@ def calcul_total_discount(loyalty_points,cid,disc):
 
 # Tax
 
-def verify_tax(products,cid,totals_by_customer,taxable):
+def verify_tax(products: dict,customer_id: int,totals_by_customer: dict,taxable:float) -> float:
     tax = 0.0
     # Vérifier si tous produits taxables
     all_taxable = True
-    for item in totals_by_customer[cid]["items"]:
+    for item in totals_by_customer[customer_id]["items"]:
         prod = products.get(item.get_product_id())
         if prod and not prod.get_taxable():
             all_taxable = False
@@ -104,7 +105,7 @@ def verify_tax(products,cid,totals_by_customer,taxable):
         tax = round(taxable * TAX, 2)  # Arrondi 2 décimales
     else:
         # Calcul taxe par ligne (plus complexe)
-        for item in totals_by_customer[cid]["items"]:
+        for item in totals_by_customer[customer_id]["items"]:
             prod = products.get(item.get_product_id())
             if prod and prod.get_taxable():
                 item_total = item.get_qty() * prod.get_price()
@@ -114,10 +115,10 @@ def verify_tax(products,cid,totals_by_customer,taxable):
 
 # Shipping cost
 
-def shipping_cost_calculation(weight,sub,shipping_zones,zone):
+def shipping_cost_calculation(weight: float,subtotal: float,shipping_zones: dict,zone: str) -> float:
     # Frais de port complexes (duplication)
     ship = 0.0
-    if sub < SHIPPING_LIMIT:
+    if subtotal < SHIPPING_LIMIT:
         ship_zone = shipping_zones.get(zone, {"base": 5.0, "per_kg": 0.5})
         base_ship = ship_zone["base"]
         if weight > 10:
@@ -139,7 +140,7 @@ def shipping_cost_calculation(weight,sub,shipping_zones,zone):
 
 # Handling free
 
-def handling_fee_calculation(item_count):
+def handling_fee_calculation(item_count: int) -> float:
     # Frais de gestion (magic number + condition cachée)
     handling = 0.0
     if item_count > 10:
@@ -150,10 +151,10 @@ def handling_fee_calculation(item_count):
 
 # Customers actions
 
-def group_by_customers(transactions,products,promotions):
+def group_by_customers(transactions: dict,products: dict,promotions: dict) -> dict:
     totals_by_customer = {}
     for transaction in transactions:
-        cid = transaction.get_customer_id()
+        customer_id = transaction.get_customer_id()
 
         # Récupération produit avec fallback
         prod = products.get(transaction.get_product_id(), {})
@@ -167,23 +168,23 @@ def group_by_customers(transactions,products,promotions):
         if hour < 10:
             morning_bonus = line_total * 0.03  # 3% réduction supplémentaire
         line_total = line_total - morning_bonus
-        if cid not in totals_by_customer:
-            totals_by_customer[cid] = {
+        if customer_id not in totals_by_customer:
+            totals_by_customer[customer_id] = {
                 "subtotal": 0.0,
                 "items": [],
                 "weight": 0.0,
                 "promo_discount": 0.0,
                 "morning_bonus": 0.0,
             }
-        totals_by_customer[cid]["subtotal"] += line_total
-        totals_by_customer[cid]["weight"] += prod.get_weight() * transaction.get_qty()
-        totals_by_customer[cid]["items"].append(transaction)
-        totals_by_customer[cid]["morning_bonus"] += morning_bonus
+        totals_by_customer[customer_id]["subtotal"] += line_total
+        totals_by_customer[customer_id]["weight"] += prod.get_weight() * transaction.get_qty()
+        totals_by_customer[customer_id]["items"].append(transaction)
+        totals_by_customer[customer_id]["morning_bonus"] += morning_bonus
     return totals_by_customer
 
 # Currency
 
-def currency_rate_value(currency): 
+def currency_rate_value(currency: str) -> float: 
     # Conversion devise (règle cachée pour non-EUR)
         currency_rate = 1.0
         if currency == "USD":

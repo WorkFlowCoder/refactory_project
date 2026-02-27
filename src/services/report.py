@@ -1,37 +1,38 @@
 import math
+from typing import Any
 from services.calculations import *
 
-def report_generator(customers,products,shipping_zones,loyalty_points,totals_by_customer,output_lines): 
+def report_generator(customers: dict,products: dict,shipping_zones: dict,loyalty_points: list,totals_by_customer: dict,output_lines: Any) -> Any: 
     json_data = []
     grand_total = 0.0
     total_tax_collected = 0.0
     # Tri par ID client (comportement à préserver)
     sorted_customer_ids = sorted(totals_by_customer.keys())
 
-    for cid in sorted_customer_ids:
-        cust = customers.get(cid, {})
-        name = cust.get_name()
-        level = cust.get_level()
-        zone = cust.get_shipping_zone()
-        currency = cust.get_currency()
+    for customer_id in sorted_customer_ids:
+        customer = customers.get(customer_id, {})
+        name = customer.get_name()
+        level = customer.get_level()
+        zone = customer.get_shipping_zone()
+        currency = customer.get_currency()
 
-        sub = totals_by_customer[cid]["subtotal"]
+        subtotal = totals_by_customer[customer_id]["subtotal"]
         
         # Remise par paliers (duplication + magic numbers)
-        disc = get_remise(sub,level,totals_by_customer,cid)
+        disc = get_remise(subtotal,level,totals_by_customer,customer_id)
 
         # Calcul remise fidélité (duplication)
-        pts, disc,loyalty_discount, total_discount = calcul_total_discount(loyalty_points,cid,disc)
+        pts, disc,loyalty_discount, total_discount = calcul_total_discount(loyalty_points,customer_id,disc)
         # Calcul taxe (gestion spéciale par produit)
-        taxable = sub - total_discount
-        tax = verify_tax(products,cid,totals_by_customer,taxable)
+        taxable = subtotal - total_discount
+        tax = verify_tax(products,customer_id,totals_by_customer,taxable)
 
         # Frais de port complexes (duplication)
-        weight = totals_by_customer[cid]["weight"]
-        ship = shipping_cost_calculation(weight,sub,shipping_zones,zone)
+        weight = totals_by_customer[customer_id]["weight"]
+        ship = shipping_cost_calculation(weight,subtotal,shipping_zones,zone)
         
         # Frais de gestion (magic number + condition cachée)
-        item_count = len(totals_by_customer[cid]["items"])
+        item_count = len(totals_by_customer[customer_id]["items"])
         handling = handling_fee_calculation(item_count)
 
         # Conversion devise (règle cachée pour non-EUR)
@@ -42,15 +43,15 @@ def report_generator(customers,products,shipping_zones,loyalty_points,totals_by_
         total_tax_collected += tax * currency_rate
 
         # Formatage texte (dispersé, pas de fonction dédiée)
-        output_lines.append(f"Customer: {name} ({cid})")
+        output_lines.append(f"Customer: {name} ({customer_id})")
         output_lines.append(f"Level: {level} | Zone: {zone} | Currency: {currency}")
-        output_lines.append(f"Subtotal: {sub:.2f}")
+        output_lines.append(f"Subtotal: {subtotal:.2f}")
         output_lines.append(f"Discount: {total_discount:.2f}")
         output_lines.append(f"  - Volume discount: {disc:.2f}")
         output_lines.append(f"  - Loyalty discount: {loyalty_discount:.2f}")
-        if totals_by_customer[cid]["morning_bonus"] > 0:
+        if totals_by_customer[customer_id]["morning_bonus"] > 0:
             output_lines.append(
-                f"  - Morning bonus: {totals_by_customer[cid]['morning_bonus']:.2f}"
+                f"  - Morning bonus: {totals_by_customer[customer_id]['morning_bonus']:.2f}"
             )
         output_lines.append(f"Tax: {tax * currency_rate:.2f}")
         output_lines.append(f"Shipping ({zone}, {weight:.1f}kg): {ship:.2f}")

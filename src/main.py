@@ -4,7 +4,7 @@ from services.report import *
 from services.calculations import (calcul_fidelity_points,group_by_customers)
 from services.Report_writer import ReportWriter
 
-def run():
+def run() -> None:
     base = os.path.dirname(__file__)
 
     #Lecture des données

@@ -7,7 +7,7 @@ from models.transaction import Transaction
 from models.promotion import Promotion
 from models.shippingZone import ShippingZone
 
-def read_file(base,path,file):
+def read_file(base: str,path: str,file: str) -> list:
     file_path = os.path.join(base, path, file)
     try:
         with open(file_path, "r", encoding="utf-8", newline="") as f:
@@ -19,7 +19,7 @@ def read_file(base,path,file):
 
 # CUSTOMERS
 
-def load_customers(base,path,file):
+def load_customers(base: str,path: str,file: str) -> dict:
     lines = read_file(base,path,file)
     customers = {}
     for row in lines:
@@ -28,7 +28,7 @@ def load_customers(base,path,file):
 
 # PRODUCTS
 
-def load_products(base,path,file):
+def load_products(base: str,path: str,file: str) -> dict:
     lines = read_file(base,path,file)
     products = {}
     for i in range(1, len(lines)):  # skip header
@@ -42,7 +42,7 @@ def load_products(base,path,file):
 
 # PROMOTIONS
 
-def load_promotions(base,path,file):
+def load_promotions(base: str,path: str,file: str) -> dict:
     lines = read_file(base,path,file)
     promotions = {}
     for i in range(1, len(lines)):
@@ -52,7 +52,7 @@ def load_promotions(base,path,file):
 
 # SHIPPING ZONES
 
-def load_shipping_zones(base,path,file):
+def load_shipping_zones(base: str,path: str,file: str) -> dict:
     lines = read_file(base,path,file)
     shipping_zones = {}
     for i in range(1, len(lines)):
@@ -62,7 +62,7 @@ def load_shipping_zones(base,path,file):
 
 # TRANSACTIONS
 
-def load_transactions(base,path,file):
+def load_transactions(base: str,path: str,file: str) -> dict:
     lines = read_file(base,path,file)
     transactions = []
     for i in range(1, len(lines)):
