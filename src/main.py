@@ -1,8 +1,3 @@
-"""
-Legacy Order Report Generator
-DO NOT USE IN PRODUCTION
-"""
-
 import csv
 import os
 import json
@@ -12,138 +7,120 @@ from datetime import datetime
 TAX = 0.2
 SHIPPING_LIMIT = 50
 SHIP = 5.0
-premium_threshold = 1000
 LOYALTY_RATIO = 0.01
-handling_fee = 2.5
+HANDLING_FREE = 2.5
 MAX_DISCOUNT = 200
 
+def read_file(base,path,file):
+    file_path = os.path.join(base, path, file)
+    try:
+        with open(file_path, "r", encoding="utf-8", newline="") as f:
+            reader = csv.reader(f)
+            return list(reader)
+    except (IndexError, ValueError):
+            pass
+    return []
 
-def run():
-    """Fonction principale qui fait TOUT (280+ lignes)"""
-    base = os.path.dirname(__file__)
-    cust_path = os.path.join(base, "data", "customers.csv")
-    ord_path = os.path.join(base, "data", "orders.csv")
-    prod_path = os.path.join(base, "data", "products.csv")
-    ship_path = os.path.join(base, "data", "shipping_zones.csv")
-    promo_path = os.path.join(base, "data", "promotions.csv")
+def print_and_save_data(result,base,json_data):
+    print(result)
+    output_path = os.path.join(base, "output.json")
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(json_data, f, indent=2)
 
-    # Lecture customers (parsing mélangé avec logique)
+def load_customers(base,path,file):
+    lines = read_file(base,path,file)
     customers = {}
-    with open(cust_path, "r", encoding="utf-8") as f:
-        reader = csv.reader(f)
-        for row in reader:
-            customers[row[0]] = {
-                "id": row[0],
-                "name": row[1],
-                "level": row[2] if len(row) > 2 else "BASIC",
-                "shipping_zone": row[3] if len(row) > 3 else "ZONE1",
-                "currency": row[4] if len(row) > 4 else "EUR",
-            }
+    for row in lines:
+        customers[row[0]] = {
+            "id": row[0],
+            "name": row[1],
+            "level": row[2] if len(row) > 2 else "BASIC",
+            "shipping_zone": row[3] if len(row) > 3 else "ZONE1",
+            "currency": row[4] if len(row) > 4 else "EUR",
+        }
+    return customers
 
-    # Lecture products (duplication du parsing, méthode différente)
+def load_products(base,path,file):
+    lines = read_file(base,path,file)
     products = {}
-    f = open(prod_path, "r", encoding="utf-8")
-    lines = f.readlines()
-    f.close()
     for i in range(1, len(lines)):  # skip header
         try:
-            parts = lines[i].strip().split(",")
-            products[parts[0]] = {
-                "id": parts[0],
-                "name": parts[1],
-                "category": parts[2],
-                "price": float(parts[3]),
-                "weight": float(parts[4]) if len(parts) > 4 else 1.0,
-                "taxable": parts[5].lower() == "true" if len(parts) > 5 else True,
+            product = lines[i]
+            products[product[0]] = {
+                "id": product[0],
+                "name": product[1],
+                "category": product[2],
+                "price": float(product[3]),
+                "weight": float(product[4]) if len(product) > 4 else 1.0,
+                "taxable": product[5].lower() == "true" if len(product) > 5 else True,
             }
         except (IndexError, ValueError):
             # Skip silencieux
             pass
+    return products
 
-    # Lecture shipping zones (encore une autre variation avec DictReader)
+def load_shipping_zones(base,path,file):
+    lines = read_file(base,path,file)
     shipping_zones = {}
-    with open(ship_path, newline="", encoding="utf-8") as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            shipping_zones[row["zone"]] = {
-                "zone": row["zone"],
-                "base": float(row["base"]),
-                "per_kg": float(row.get("per_kg", 0.5)),
-            }
+    for i in range(1, len(lines)):
+        shipping_zone = lines[i]
+        shipping_zones[shipping_zone[0]] = {
+            "zone": shipping_zone[0],
+            "base": float(shipping_zone[1]),
+            "per_kg": float(shipping_zone[2]) if len(shipping_zone) > 2 else 0.5,
+        }
+    return shipping_zones
 
-    # Lecture promotions (parsing manuel avec split)
+def load_promotions(base,path,file):
+    lines = read_file(base,path,file)
     promotions = {}
-    if os.path.exists(promo_path):
+    for i in range(1, len(lines)):
+        promo = lines[i]
+        promotions[promo[0]] = {
+            "code": promo[0],
+            "type": promo[1],
+            "value": promo[2],
+            "active": promo[3] != "false" if len(promo) > 3 else True,
+        }
+    return promotions
+
+def load_transactions(base,path,file):
+    lines = read_file(base,path,file)
+    transactions = []
+    for i in range(1, len(lines)):
+        transaction = lines[i]
         try:
-            with open(promo_path, "r") as f:
-                content = f.read()
-                lines = content.split("\n")
-                for i, line in enumerate(lines):
-                    if i == 0 or not line.strip():
-                        continue
-                    p = line.split(",")
-                    promotions[p[0]] = {
-                        "code": p[0],
-                        "type": p[1],
-                        "value": p[2],
-                        "active": p[3] != "false" if len(p) > 3 else True,
-                    }
-        except Exception:
-            # Ignore les erreurs de fichier promo
-            pass
+            transactions.append(
+                {
+                    "id": transaction[0],
+                    "customer_id": transaction[1],
+                    "product_id": transaction[2],
+                    "qty": int(transaction[3]),
+                    "unit_price": float(transaction[4]),
+                    "date": transaction[5],
+                    "promo_code": transaction[6],
+                    "time": transaction[7] if transaction[7] else "12:00",
+                }
+            )
+        except Exception as e:
+            continue
+    return transactions
 
-    # Lecture orders (mélange DictReader et validation)
-    orders = []
-    with open(ord_path, newline="", encoding="utf-8") as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            try:
-                qty = int(row["qty"])
-                price = float(row["unit_price"])
-
-                if qty <= 0 or price < 0:
-                    continue  # validation silencieuse
-
-                orders.append(
-                    {
-                        "id": row["id"],
-                        "customer_id": row["customer_id"],
-                        "product_id": row["product_id"],
-                        "qty": qty,
-                        "unit_price": price,
-                        "date": row.get("date", ""),
-                        "promo_code": row.get("promo_code", ""),
-                        "time": row.get("time", "12:00"),
-                    }
-                )
-            except Exception:
-                # Skip silencieux
-                continue
-
-    # Calcul points de fidélité (première duplication)
+def calcul_fidelity_points(transactions):
     loyalty_points = {}
-    for o in orders:
-        cid = o["customer_id"]
+    for transaction in transactions:
+        cid = transaction["customer_id"]
         if cid not in loyalty_points:
             loyalty_points[cid] = 0
-        # Calcul basé sur prix commande
-        loyalty_points[cid] += o["qty"] * o["unit_price"] * LOYALTY_RATIO
+        loyalty_points[cid] += transaction["qty"] * transaction["unit_price"] * LOYALTY_RATIO
+    return loyalty_points
 
-    # Groupement par client (logique métier mélangée avec aggregation)
-    totals_by_customer = {}
-    for o in orders:
-        cid = o["customer_id"]
-
-        # Récupération produit avec fallback
-        prod = products.get(o["product_id"], {})
-        base_price = prod.get("price", o["unit_price"])
-
-        # Application promo (logique complexe et bugguée)
-        promo_code = o["promo_code"]
-        discount_rate = 0
-        fixed_discount = 0
-
-        if promo_code and promo_code in promotions:
+def calcul_with_promo(transaction,prod,promotions):
+    discount_rate = 0
+    fixed_discount = 0
+    promo_code = transaction["promo_code"]
+    base_price = prod.get("price", transaction["unit_price"])
+    if promo_code and promo_code in promotions:
             promo = promotions[promo_code]
             if promo["active"]:
                 if promo["type"] == "PERCENTAGE":
@@ -151,19 +128,29 @@ def run():
                 elif promo["type"] == "FIXED":
                     # Bug: appliqué par ligne au lieu de global
                     fixed_discount = float(promo["value"])
+    # Calcul ligne avec réduction promo
+    line_total = (
+        transaction["qty"] * base_price * (1 - discount_rate) - fixed_discount * transaction["qty"]
+    )
+    return line_total
 
-        # Calcul ligne avec réduction promo
-        line_total = (
-            o["qty"] * base_price * (1 - discount_rate) - fixed_discount * o["qty"]
-        )
+def group_by_customers(transactions,products,promotions):
+    totals_by_customer = {}
+    for transaction in transactions:
+        cid = transaction["customer_id"]
 
-        # Bonus matin (règle cachée basée sur heure)
-        hour = int(o["time"].split(":")[0])
+        # Récupération produit avec fallback
+        prod = products.get(transaction["product_id"], {})
+
+        # Application promo (logique complexe et bugguée)
+        line_total = calcul_with_promo(transaction,prod,promotions)
+
         morning_bonus = 0
+        # Bonus matin (règle cachée basée sur heure)
+        hour = int(transaction["time"].split(":")[0])
         if hour < 10:
             morning_bonus = line_total * 0.03  # 3% réduction supplémentaire
         line_total = line_total - morning_bonus
-
         if cid not in totals_by_customer:
             totals_by_customer[cid] = {
                 "subtotal": 0.0,
@@ -172,18 +159,126 @@ def run():
                 "promo_discount": 0.0,
                 "morning_bonus": 0.0,
             }
-
         totals_by_customer[cid]["subtotal"] += line_total
-        totals_by_customer[cid]["weight"] += prod.get("weight", 1.0) * o["qty"]
-        totals_by_customer[cid]["items"].append(o)
+        totals_by_customer[cid]["weight"] += prod.get("weight", 1.0) * transaction["qty"]
+        totals_by_customer[cid]["items"].append(transaction)
         totals_by_customer[cid]["morning_bonus"] += morning_bonus
+    return totals_by_customer
 
-    # Génération rapport (mélange calculs + formatage + I/O)
-    output_lines = []
+def get_remise(sub,level,totals_by_customer,cid):
+    disc = 0.0
+    if sub > 50:
+        disc = sub * 0.05
+    if sub > 100:
+        disc = sub * 0.10  # écrase la précédente (bug intentionnel)
+    if sub > 500:
+        disc = sub * 0.15
+    if sub > 1000 and level == "PREMIUM":
+        disc = sub * 0.20
+    first_order_date = (
+        totals_by_customer[cid]["items"][0].get("date", "")
+        if totals_by_customer[cid]["items"]
+        else ""
+    )
+    day_of_week = 0
+    if first_order_date:
+        try:
+            dt = datetime.strptime(first_order_date, "%Y-%m-%d")
+            day_of_week = dt.weekday()
+        except (IndexError, ValueError):
+            pass
+    # weekday: 0=Monday, 5=Saturday, 6=Sunday
+    if day_of_week == 5 or day_of_week == 6:
+        disc = disc * 1.05  # 5% bonus sur remise
+    return disc
+
+def calcul_total_discount(loyalty_points,cid,disc):
+    loyalty_discount = 0.0
+    pts = loyalty_points.get(cid, 0)
+    if pts > 100:
+        loyalty_discount = min(pts * 0.1, 50.0)
+    if pts > 500:
+        loyalty_discount = min(pts * 0.15, 100.0)  # écrase précédent
+    total_discount = disc + loyalty_discount
+    if total_discount > MAX_DISCOUNT:
+        total_discount = MAX_DISCOUNT
+        # Ajustement proportionnel (logique complexe)
+        ratio = (
+            MAX_DISCOUNT / (disc + loyalty_discount)
+            if (disc + loyalty_discount) > 0
+            else 1
+        )
+        disc = disc * ratio
+        loyalty_discount = loyalty_discount * ratio
+    return pts,disc,loyalty_discount, total_discount
+
+def verify_tax(products,cid,totals_by_customer,taxable):
+    tax = 0.0
+    # Vérifier si tous produits taxables
+    all_taxable = True
+    for item in totals_by_customer[cid]["items"]:
+        prod = products.get(item["product_id"])
+        if prod and not prod.get("taxable", True):
+            all_taxable = False
+            break
+
+    if all_taxable:
+        tax = round(taxable * TAX, 2)  # Arrondi 2 décimales
+    else:
+        # Calcul taxe par ligne (plus complexe)
+        for item in totals_by_customer[cid]["items"]:
+            prod = products.get(item["product_id"])
+            if prod and prod.get("taxable", True):
+                item_total = item["qty"] * prod.get("price", item["unit_price"])
+                tax += item_total * TAX
+        tax = round(tax, 2)
+    return tax
+
+def shipping_cost_calculation(weight,sub,shipping_zones,zone):
+    # Frais de port complexes (duplication)
+    ship = 0.0
+    if sub < SHIPPING_LIMIT:
+        ship_zone = shipping_zones.get(zone, {"base": 5.0, "per_kg": 0.5})
+        base_ship = ship_zone["base"]
+        if weight > 10:
+            ship = base_ship + (weight - 10) * ship_zone["per_kg"]
+        elif weight > 5:
+            # Palier intermédiaire (règle cachée)
+            ship = base_ship + (weight - 5) * 0.3
+        else:
+            ship = base_ship
+
+        # Majoration zones éloignées
+        if zone == "ZONE3" or zone == "ZONE4":
+            ship = ship * 1.2
+    else:
+        # Livraison gratuite mais frais manutention poids élevé
+        if weight > 20:
+            ship = (weight - 20) * 0.25
+    return ship
+
+def handling_fee_calculation(item_count):
+    # Frais de gestion (magic number + condition cachée)
+    handling = 0.0
+    if item_count > 10:
+        handling = HANDLING_FREE
+    if item_count > 20:
+        handling = HANDLING_FREE * 2  # double pour grosses commandes
+    return handling
+
+def currency_rate_value(currency): 
+    # Conversion devise (règle cachée pour non-EUR)
+        currency_rate = 1.0
+        if currency == "USD":
+            return 1.1
+        elif currency == "GBP":
+            return 0.85
+        return currency_rate
+
+def report_generator(customers,products,shipping_zones,loyalty_points,totals_by_customer,output_lines): 
     json_data = []
     grand_total = 0.0
     total_tax_collected = 0.0
-
     # Tri par ID client (comportement à préserver)
     sorted_customer_ids = sorted(totals_by_customer.keys())
 
@@ -195,117 +290,26 @@ def run():
         currency = cust.get("currency", "EUR")
 
         sub = totals_by_customer[cid]["subtotal"]
-
+        
         # Remise par paliers (duplication + magic numbers)
-        disc = 0.0
-        if sub > 50:
-            disc = sub * 0.05
-        if sub > 100:
-            disc = sub * 0.10  # écrase la précédente (bug intentionnel)
-        if sub > 500:
-            disc = sub * 0.15
-        if sub > 1000 and level == "PREMIUM":
-            disc = sub * 0.20
-
-        # Bonus weekend (règle cachée basée sur date)
-        first_order_date = (
-            totals_by_customer[cid]["items"][0].get("date", "")
-            if totals_by_customer[cid]["items"]
-            else ""
-        )
-        day_of_week = 0
-        if first_order_date:
-            try:
-                dt = datetime.strptime(first_order_date, "%Y-%m-%d")
-                day_of_week = dt.weekday()
-            except (IndexError, ValueError):
-                pass
-        # weekday: 0=Monday, 5=Saturday, 6=Sunday
-        if day_of_week == 5 or day_of_week == 6:
-            disc = disc * 1.05  # 5% bonus sur remise
+        disc = get_remise(sub,level,totals_by_customer,cid)
 
         # Calcul remise fidélité (duplication)
-        loyalty_discount = 0.0
-        pts = loyalty_points.get(cid, 0)
-        if pts > 100:
-            loyalty_discount = min(pts * 0.1, 50.0)
-        if pts > 500:
-            loyalty_discount = min(pts * 0.15, 100.0)  # écrase précédent
-
-        # Plafond remise global (règle cachée)
-        total_discount = disc + loyalty_discount
-        if total_discount > MAX_DISCOUNT:
-            total_discount = MAX_DISCOUNT
-            # Ajustement proportionnel (logique complexe)
-            ratio = (
-                MAX_DISCOUNT / (disc + loyalty_discount)
-                if (disc + loyalty_discount) > 0
-                else 1
-            )
-            disc = disc * ratio
-            loyalty_discount = loyalty_discount * ratio
-
+        pts, disc,loyalty_discount, total_discount = calcul_total_discount(loyalty_points,cid,disc)
         # Calcul taxe (gestion spéciale par produit)
         taxable = sub - total_discount
-        tax = 0.0
-
-        # Vérifier si tous produits taxables
-        all_taxable = True
-        for item in totals_by_customer[cid]["items"]:
-            prod = products.get(item["product_id"])
-            if prod and not prod.get("taxable", True):
-                all_taxable = False
-                break
-
-        if all_taxable:
-            tax = round(taxable * TAX, 2)  # Arrondi 2 décimales
-        else:
-            # Calcul taxe par ligne (plus complexe)
-            for item in totals_by_customer[cid]["items"]:
-                prod = products.get(item["product_id"])
-                if prod and prod.get("taxable", True):
-                    item_total = item["qty"] * prod.get("price", item["unit_price"])
-                    tax += item_total * TAX
-            tax = round(tax, 2)
+        tax = verify_tax(products,cid,totals_by_customer,taxable)
 
         # Frais de port complexes (duplication)
-        ship = 0.0
         weight = totals_by_customer[cid]["weight"]
-
-        if sub < SHIPPING_LIMIT:
-            ship_zone = shipping_zones.get(zone, {"base": 5.0, "per_kg": 0.5})
-            base_ship = ship_zone["base"]
-
-            if weight > 10:
-                ship = base_ship + (weight - 10) * ship_zone["per_kg"]
-            elif weight > 5:
-                # Palier intermédiaire (règle cachée)
-                ship = base_ship + (weight - 5) * 0.3
-            else:
-                ship = base_ship
-
-            # Majoration zones éloignées
-            if zone == "ZONE3" or zone == "ZONE4":
-                ship = ship * 1.2
-        else:
-            # Livraison gratuite mais frais manutention poids élevé
-            if weight > 20:
-                ship = (weight - 20) * 0.25
-
+        ship = shipping_cost_calculation(weight,sub,shipping_zones,zone)
+        
         # Frais de gestion (magic number + condition cachée)
-        handling = 0.0
         item_count = len(totals_by_customer[cid]["items"])
-        if item_count > 10:
-            handling = handling_fee
-        if item_count > 20:
-            handling = handling_fee * 2  # double pour grosses commandes
+        handling = handling_fee_calculation(item_count)
 
         # Conversion devise (règle cachée pour non-EUR)
-        currency_rate = 1.0
-        if currency == "USD":
-            currency_rate = 1.1
-        elif currency == "GBP":
-            currency_rate = 0.85
+        currency_rate = currency_rate_value(currency)
 
         total = round((taxable + tax + ship + handling) * currency_rate, 2)
         grand_total += total
@@ -329,33 +333,36 @@ def run():
         output_lines.append(f"Total: {total:.2f} {currency}")
         output_lines.append(f"Loyalty Points: {math.floor(pts)}")
         output_lines.append("")
+    return (json_data,grand_total,total_tax_collected)
 
-        # Export JSON en parallèle (side effect)
-        json_data.append(
-            {
-                "customer_id": cid,
-                "name": name,
-                "total": total,
-                "currency": currency,
-                "loyalty_points": math.floor(pts),
-            }
-        )
+def run():
+    base = os.path.dirname(__file__)
 
-    output_lines.append(f"Grand Total: {grand_total:.2f} EUR")
-    output_lines.append(f"Total Tax Collected: {total_tax_collected:.2f} EUR")
+    #Lecture des données
+    customers = load_customers(base, "data", "customers.csv")
+    products = load_products(base, "data", "products.csv")
+    shipping_zones = load_shipping_zones(base, "data", "shipping_zones.csv")
+    promotions = load_promotions(base, "data", "promotions.csv")
+    orders = load_transactions(base, "data", "orders.csv")
+
+    # Calcul points de fidélité (première duplication)
+    loyalty_points =  calcul_fidelity_points(orders)
+
+    # Groupement par client (logique métier mélangée avec aggregation)
+    totals_by_customer = group_by_customers(orders,products,promotions)
+
+    # Génération rapport (mélange calculs + formatage + I/O)
+    output_lines = []
+
+    report= report_generator(customers,products,shipping_zones,loyalty_points,totals_by_customer,output_lines)
+
+    output_lines.append(f"Grand Total: {report[1]:.2f} EUR")
+    output_lines.append(f"Total Tax Collected: {report[2]:.2f} EUR")
 
     result = "\n".join(output_lines)
-
-    # Side effects: print + file write
-    print(result)
-
-    # Export JSON surprise
-    output_path = os.path.join(base, "output.json")
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(json_data, f, indent=2)
+    print_and_save_data(result,base,report[0])
 
     return result
-
 
 if __name__ == "__main__":
     run()
