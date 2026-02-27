@@ -8,6 +8,7 @@ from models.promotion import Promotion
 from models.shippingZone import ShippingZone
 
 
+# Lecture générique d'un fichier CSV
 def read_file(base: str, path: str, file: str) -> list:
     file_path = os.path.join(base, path, file)
     try:
@@ -19,20 +20,17 @@ def read_file(base: str, path: str, file: str) -> list:
     return []
 
 
-# CUSTOMERS
-
-
+# Chargement des clients
 def load_customers(base: str, path: str, file: str) -> dict:
     lines = read_file(base, path, file)
     customers = {}
     for row in lines:
+        # Création d'un objet Customer pour chaque ligne
         customers[row[0]] = Customer(row[0], row[1], row[2], row[3], row[4])
     return customers
 
 
-# PRODUCTS
-
-
+# Chargement des produits
 def load_products(base: str, path: str, file: str) -> dict:
     lines = read_file(base, path, file)
     products = {}
@@ -41,30 +39,25 @@ def load_products(base: str, path: str, file: str) -> dict:
             product = lines[i]
             products[product[0]] = Product(product)
         except (IndexError, ValueError):
-            # Skip silencieux
             pass
     return products
 
 
-# PROMOTIONS
-
-
+# Chargement des promotions
 def load_promotions(base: str, path: str, file: str) -> dict:
     lines = read_file(base, path, file)
     promotions = {}
-    for i in range(1, len(lines)):
+    for i in range(1, len(lines)):  # skip header
         promo = lines[i]
         promotions[promo[0]] = Promotion(promo)
     return promotions
 
 
-# SHIPPING ZONES
-
-
+# Chargement des zones de livraison
 def load_shipping_zones(base: str, path: str, file: str) -> dict:
     lines = read_file(base, path, file)
     shipping_zones = {}
-    for i in range(1, len(lines)):
+    for i in range(1, len(lines)):  # skip header
         shipping_zone = lines[i]
         shipping_zones[shipping_zone[0]] = ShippingZone(
             shipping_zone[0], shipping_zone[1], shipping_zone[2]
@@ -72,13 +65,11 @@ def load_shipping_zones(base: str, path: str, file: str) -> dict:
     return shipping_zones
 
 
-# TRANSACTIONS
-
-
+# Chargement des transactions
 def load_transactions(base: str, path: str, file: str) -> dict:
     lines = read_file(base, path, file)
     transactions = []
-    for i in range(1, len(lines)):
+    for i in range(1, len(lines)):  # skip header
         transaction = lines[i]
         try:
             transactions.append(Transaction(transaction))

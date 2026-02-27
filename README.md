@@ -24,49 +24,46 @@ curl -sSL https://install.python-poetry.org | python3 -
 python legacy/order_report_legacy.py
 # Exécuter le code refactorisé
 poetry run python src/main.py
-### Exécuter les testes
+### Exécuter les tests
 poetry run pytest
 ```
 
 ## Comparatif entre les sorties
 Le comparatif ce fait de la façon suivante :
 ```bash
-poetry run pytest tests/test_report_writer.p
+poetry run pytest tests/test_report_writer.py
 ```
 
-## Exécution
-```bash
-#Exécuter le code non factorisé
-python legacy/order_report_legacy.py
-# Exécuter le code refactorisé
-poetry run python src/main.py
-### Exécuter les testes
-poetry run pytest
-```
+## Refactoring
 
-## Choix de Refactoring
+1. **Suppression des variables inutiles** : Nettoyage rapide du code pour améliorer la lisibilité et faciliter la compréhension.
+Les variables superflues ont été retirées pour que chaque ligne ait un rôle clair.
 
-// A venir
+2. **Séparation du code en fonctions** : Chaque fonction répond maintenant à un objectif précis (calcul des remises, taxes, frais de port, formatage du rapport).
+Cela permet d’avoir un code plus aéré, facile à lire et à maintenir.
 
-## Solutions Apportées
+3. **Création de classes pour les entités** : Les entités comme *Customer* ou *Product* peuvent désormais être représentées par des objets avec des attributs.
+Cela apporte une meilleure compréhension du code et une base solide pour l’évolution du projet, en facilitant la maintenance et l’ajout de nouvelles fonctionnalités.
 
-// A venir
+4. **Création de services** : Les fonctions ont été regroupées selon leur rôle (calculs, gestion des remises, gestion des taxes, etc.).
+Cette structuration par service à responsabilité unique permet d’avoir un code modulable et plus clair, tout en préparant l’architecture pour de futures extensions.
 
-### Architecture Choisie
+## Ce qui n'a pas été fait (par manque de temps)
 
-// A venir
+Avec plus de temps, plusieurs éléments serait à continuer :
 
-### Exemples Concrets
+- Les tests unitaires n’ont pas encore été écrits, ce qui est essentiel pour sécuriser les futurs changements.
 
-// A venir
+- Une séparation plus fine des services pourrait être envisagée pour aerer encore plus calculations.py.
 
-**Exemple 1 : [Nom du refactoring]**
-- Problème : [code smell spécifique]
-- Solution : [approche retenue]
+## Compromis Assumés
 
-**Exemple 2 : [Autre refactoring]**
-- ...
+- Nombre de services : Avec plus de temps, il aurait été possible de créer davantage de services, chacun avec une responsabilité très précise, ce qui aurait encore amélioré la lisibilité et la modularité du code.
 
-## Limites et Améliorations Futures
+## Pistes d'Amélioration Future
 
-// A venir
+- Réalisation d'une documentation
+
+- Il manque des commentaires explicatifs sur certaines fonctions complexes
+
+- Ajouter des logs pour le suivi des calculs
