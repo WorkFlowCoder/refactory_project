@@ -29,7 +29,20 @@ poetry run pytest
 ```
 
 ## Comparatif entre les sorties
-// A venir
+Le comparatif ce fait de la façon suivante :
+```bash
+poetry run pytest tests/test_report_writer.p
+```
+
+## Exécution
+```bash
+#Exécuter le code non factorisé
+python legacy/order_report_legacy.py
+# Exécuter le code refactorisé
+poetry run python src/main.py
+### Exécuter les testes
+poetry run pytest
+```
 
 ## Choix de Refactoring
 

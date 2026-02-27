@@ -6,6 +6,9 @@ authors = [
     {name = "Julia <julia.maurand@gmail.com>"}
 ]
 requires-python = ">=3.10"
+packages = [
+    {include = "*", from = "src"}
+]
 dependencies = [
 ]
 

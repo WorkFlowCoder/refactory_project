@@ -2,6 +2,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 def test_golden_master():
     """Golden Master Test: Compare legacy and refactored outputs."""
 
@@ -20,7 +21,7 @@ def test_golden_master():
         [sys.executable, str(refactored_path)],
         capture_output=True,
         text=True,
-        check=True
+        check=True,
     )
     refactored_output = refactored_result.stdout
     generated_output = report_file.read_text()
