@@ -31,7 +31,6 @@ def run():
     customers = {}
     with open(cust_path, "r", encoding="utf-8") as f:
         reader = csv.reader(f)
-        header = next(reader)
         for row in reader:
             customers[row[0]] = {
                 "id": row[0],
@@ -57,7 +56,7 @@ def run():
                 "weight": float(parts[4]) if len(parts) > 4 else 1.0,
                 "taxable": parts[5].lower() == "true" if len(parts) > 5 else True,
             }
-        except:
+        except (IndexError, ValueError):
             # Skip silencieux
             pass
 
@@ -89,7 +88,7 @@ def run():
                         "value": p[2],
                         "active": p[3] != "false" if len(p) > 3 else True,
                     }
-        except Exception as e:
+        except Exception:
             # Ignore les erreurs de fichier promo
             pass
 
@@ -117,7 +116,7 @@ def run():
                         "time": row.get("time", "12:00"),
                     }
                 )
-            except Exception as e:
+            except Exception:
                 # Skip silencieux
                 continue
 
@@ -219,7 +218,7 @@ def run():
             try:
                 dt = datetime.strptime(first_order_date, "%Y-%m-%d")
                 day_of_week = dt.weekday()
-            except:
+            except (IndexError, ValueError):
                 pass
         # weekday: 0=Monday, 5=Saturday, 6=Sunday
         if day_of_week == 5 or day_of_week == 6:
@@ -254,7 +253,7 @@ def run():
         all_taxable = True
         for item in totals_by_customer[cid]["items"]:
             prod = products.get(item["product_id"])
-            if prod and prod.get("taxable", True) == False:
+            if prod and not prod.get("taxable", True):
                 all_taxable = False
                 break
 
@@ -264,7 +263,7 @@ def run():
             # Calcul taxe par ligne (plus complexe)
             for item in totals_by_customer[cid]["items"]:
                 prod = products.get(item["product_id"])
-                if prod and prod.get("taxable", True) != False:
+                if prod and prod.get("taxable", True):
                     item_total = item["qty"] * prod.get("price", item["unit_price"])
                     tax += item_total * TAX
             tax = round(tax, 2)
