@@ -1,0 +1,23 @@
+[project]
+name = "refactory_project"
+version = "0.1.0"
+description = "Python refactoring project"
+authors = [
+    {name = "Julia <julia.maurand@gmail.com>"}
+]
+requires-python = ">=3.10"
+dependencies = [
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "black (>=26.1.0,<27.0.0)",
+    "mypy (>=1.19.1,<2.0.0)",
+    "pytest (>=9.0.2,<10.0.0)",
+    "pylint (>=4.0.5,<5.0.0)"
+]
